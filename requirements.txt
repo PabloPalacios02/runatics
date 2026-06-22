@@ -1,0 +1,8 @@
+streamlit
+pandas
+plotly
+requests
+tomli
+garminconnect
+google-generativeai
+supabase
