@@ -50,6 +50,15 @@ def _fecha_str(fecha):
     return str(fecha)
 
 
+def _to_float(value, default=0):
+    try:
+        if value is None or value == "":
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
 # ============================================================
 # ALIMENTOS
 # ============================================================
@@ -86,13 +95,13 @@ def guardar_alimento(nombre, barcode, kcal, proteina, carbos, grasas):
         "user_id": user_id,
         "nombre": nombre,
         "barcode": barcode,
-        "kcal_100g": float(kcal or 0),
-        "proteina_100g": float(proteina or 0),
-        "carbos_100g": float(carbos or 0),
-        "grasas_100g": float(grasas or 0),
+        "kcal_100g": _to_float(kcal),
+        "proteina_100g": _to_float(proteina),
+        "carbos_100g": _to_float(carbos),
+        "grasas_100g": _to_float(grasas),
     }
 
-    (_client().table("foods").upsert(data, on_conflict="user_id,nombre").execute())
+    _client().table("foods").upsert(data, on_conflict="user_id,nombre").execute()
 
 
 # ============================================================
@@ -139,11 +148,11 @@ def guardar_comida(fecha, comida, alimento, gramos, kcal, proteina, carbos, gras
         "fecha": _fecha_str(fecha),
         "comida": comida,
         "alimento": alimento,
-        "gramos": float(gramos or 0),
-        "kcal": float(kcal or 0),
-        "proteina": float(proteina or 0),
-        "carbos": float(carbos or 0),
-        "grasas": float(grasas or 0),
+        "gramos": _to_float(gramos),
+        "kcal": _to_float(kcal),
+        "proteina": _to_float(proteina),
+        "carbos": _to_float(carbos),
+        "grasas": _to_float(grasas),
     }
 
     _client().table("food_logs").insert(data).execute()
@@ -255,7 +264,7 @@ def cargar_perfil():
         **perfil_base,
     }
 
-    (_client().table("profiles").upsert(data, on_conflict="user_id").execute())
+    _client().table("profiles").upsert(data, on_conflict="user_id").execute()
 
     return pd.Series(perfil_base)
 
@@ -265,17 +274,17 @@ def guardar_perfil(peso, altura, edad, superavit, swim, bike, run):
 
     data = {
         "user_id": user_id,
-        "peso": float(peso),
-        "altura": float(altura),
-        "edad": int(edad),
+        "peso": _to_float(peso),
+        "altura": _to_float(altura),
+        "edad": int(_to_float(edad, 23)),
         "objetivo": "Ganar masa + deporte",
-        "superavit": int(superavit),
-        "target_swim_min": float(swim),
-        "target_bike_min": float(bike),
-        "target_run_min": float(run),
+        "superavit": int(_to_float(superavit, 300)),
+        "target_swim_min": _to_float(swim),
+        "target_bike_min": _to_float(bike),
+        "target_run_min": _to_float(run),
     }
 
-    (_client().table("profiles").upsert(data, on_conflict="user_id").execute())
+    _client().table("profiles").upsert(data, on_conflict="user_id").execute()
 
 
 # ============================================================
@@ -311,10 +320,10 @@ def guardar_peso(fecha, peso):
     data = {
         "user_id": user_id,
         "fecha": _fecha_str(fecha),
-        "peso": float(peso),
+        "peso": _to_float(peso),
     }
 
-    (_client().table("weight_logs").upsert(data, on_conflict="user_id,fecha").execute())
+    _client().table("weight_logs").upsert(data, on_conflict="user_id,fecha").execute()
 
 
 # ============================================================
@@ -347,7 +356,7 @@ def guardar_favorito(nombre_favorito, comida, alimento, gramos):
         "nombre_favorito": nombre_favorito,
         "comida": comida,
         "alimento": alimento,
-        "gramos": float(gramos or 0),
+        "gramos": _to_float(gramos),
     }
 
     _client().table("favorite_meals").insert(data).execute()
@@ -364,7 +373,7 @@ def registrar_favorito(nombre_favorito, fecha):
 
     for _, item in fav.iterrows():
         alimento = item["alimento"]
-        gramos = float(item["gramos"])
+        gramos = _to_float(item["gramos"])
         comida = item["comida"]
 
         fila = alimentos[alimentos["nombre"] == alimento]
@@ -375,10 +384,10 @@ def registrar_favorito(nombre_favorito, fecha):
         fila = fila.iloc[0]
         factor = gramos / 100
 
-        kcal = round(float(fila["kcal_100g"]) * factor, 1)
-        proteina = round(float(fila["proteina_100g"]) * factor, 1)
-        carbos = round(float(fila["carbos_100g"]) * factor, 1)
-        grasas = round(float(fila["grasas_100g"]) * factor, 1)
+        kcal = round(_to_float(fila["kcal_100g"]) * factor, 1)
+        proteina = round(_to_float(fila["proteina_100g"]) * factor, 1)
+        carbos = round(_to_float(fila["carbos_100g"]) * factor, 1)
+        grasas = round(_to_float(fila["grasas_100g"]) * factor, 1)
 
         guardar_comida(
             fecha,
@@ -409,6 +418,9 @@ def cargar_competiciones():
         "distancia_km",
         "prioridad",
         "objetivo_tiempo_min",
+        "objetivo_swim_min",
+        "objetivo_bike_min",
+        "objetivo_run_min",
         "notas",
         "activa",
         "es_principal",
@@ -463,6 +475,9 @@ def guardar_competicion(
     prioridad,
     objetivo_tiempo_min,
     notas,
+    objetivo_swim_min=0,
+    objetivo_bike_min=0,
+    objetivo_run_min=0,
     activa=True,
     es_principal=False,
 ):
@@ -477,9 +492,12 @@ def guardar_competicion(
         "fecha": _fecha_str(fecha),
         "tipo": tipo,
         "distancia": distancia,
-        "distancia_km": float(distancia_km or 0),
+        "distancia_km": _to_float(distancia_km),
         "prioridad": prioridad,
-        "objetivo_tiempo_min": float(objetivo_tiempo_min or 0),
+        "objetivo_tiempo_min": _to_float(objetivo_tiempo_min),
+        "objetivo_swim_min": _to_float(objetivo_swim_min),
+        "objetivo_bike_min": _to_float(objetivo_bike_min),
+        "objetivo_run_min": _to_float(objetivo_run_min),
         "notas": notas,
         "activa": bool(activa),
         "es_principal": bool(es_principal),
@@ -500,6 +518,9 @@ def actualizar_competicion(
     notas,
     activa,
     es_principal,
+    objetivo_swim_min=0,
+    objetivo_bike_min=0,
+    objetivo_run_min=0,
 ):
     if es_principal and activa:
         _desmarcar_principal_actual()
@@ -509,19 +530,22 @@ def actualizar_competicion(
         "fecha": _fecha_str(fecha),
         "tipo": tipo,
         "distancia": distancia,
-        "distancia_km": float(distancia_km or 0),
+        "distancia_km": _to_float(distancia_km),
         "prioridad": prioridad,
-        "objetivo_tiempo_min": float(objetivo_tiempo_min or 0),
+        "objetivo_tiempo_min": _to_float(objetivo_tiempo_min),
+        "objetivo_swim_min": _to_float(objetivo_swim_min),
+        "objetivo_bike_min": _to_float(objetivo_bike_min),
+        "objetivo_run_min": _to_float(objetivo_run_min),
         "notas": notas,
         "activa": bool(activa),
         "es_principal": bool(es_principal),
     }
 
-    (_client().table("competitions").update(data).eq("id", competition_id).execute())
+    _client().table("competitions").update(data).eq("id", competition_id).execute()
 
 
 def eliminar_competicion(competition_id):
-    (_client().table("competitions").delete().eq("id", competition_id).execute())
+    _client().table("competitions").delete().eq("id", competition_id).execute()
 
 
 def cargar_competicion_principal():

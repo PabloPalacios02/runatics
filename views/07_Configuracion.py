@@ -10,7 +10,7 @@ def render():
 
     perfil = cargar_perfil()
 
-    hero("Configuración", "Personaliza tus objetivos deportivos y nutricionales.")
+    hero("Configuración", "Personaliza tus datos generales y preferencias de la app.")
 
     st.subheader("Perfil del usuario")
 
@@ -49,35 +49,8 @@ def render():
         )
 
         st.caption(
-            "Un superávit moderado ayuda a ganar masa sin subir demasiada grasa."
+            "Los objetivos deportivos concretos se configuran en la sección Competiciones."
         )
-
-        st.divider()
-
-        st.subheader("Objetivos de triatlón olímpico")
-
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-            swim = st.number_input(
-                "Natación 1500 m (min)",
-                value=float(perfil["target_swim_min"]),
-                step=1.0,
-            )
-
-        with c2:
-            bike = st.number_input(
-                "Bici 40 km (min)",
-                value=float(perfil["target_bike_min"]),
-                step=1.0,
-            )
-
-        with c3:
-            run = st.number_input(
-                "Carrera 10 km (min)",
-                value=float(perfil["target_run_min"]),
-                step=1.0,
-            )
 
         guardar = st.form_submit_button("Guardar configuración")
 
@@ -87,9 +60,9 @@ def render():
                 altura,
                 edad,
                 superavit,
-                swim,
-                bike,
-                run,
+                perfil["target_swim_min"],
+                perfil["target_bike_min"],
+                perfil["target_run_min"],
             )
             st.success("Configuración guardada correctamente.")
 
@@ -104,8 +77,6 @@ def render():
     metric_card(c3, "Edad", perfil["edad"])
     metric_card(c4, "Superávit", f"{perfil['superavit']} kcal")
 
-    c1, c2, c3 = st.columns(3)
-
-    metric_card(c1, "🏊 Natación", f"{perfil['target_swim_min']} min")
-    metric_card(c2, "🚴 Bici", f"{perfil['target_bike_min']} min")
-    metric_card(c3, "🏃 Carrera", f"{perfil['target_run_min']} min")
+    st.info(
+        "Para definir carreras, triatlones, marchas ciclistas u otros objetivos, usa la pestaña Competiciones."
+    )

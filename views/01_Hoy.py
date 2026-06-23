@@ -3,23 +3,29 @@ import streamlit as st
 
 from ui.cards import metric_card
 from ui.theme import aplicar_estilos, hero
-
-from config.settings import OBJETIVO_FECHA
 from ui.app_state import get_datos
-from data_store.storage import cargar_perfil, cargar_diario
-from core.training_metrics import (
-    calcular_objetivos_dinamicos,
-    generar_entrenamiento_detallado,
-    calcular_recovery_score,
-)
 
 from data_store.storage import (
     cargar_perfil,
     cargar_diario,
     cargar_competicion_principal,
     cargar_competiciones_secundarias_activas,
+    cargar_competiciones_activas,
 )
-from core.competition_logic import dias_hasta, fase_por_competicion, resumen_competicion
+
+from core.training_metrics import (
+    calcular_objetivos_dinamicos,
+    generar_entrenamiento_detallado,
+    calcular_recovery_score,
+)
+
+from core.competition_logic import (
+    dias_hasta,
+    fase_por_competicion,
+    resumen_competicion,
+)
+
+from core.competition_metrics import predicciones_para_competicion
 
 
 def render():
@@ -106,6 +112,29 @@ def render():
             "No hay competición principal activa. La app usará una planificación general."
         )
 
+    competiciones_activas = cargar_competiciones_activas()
+
+    if competiciones_activas is not None and not competiciones_activas.empty:
+        st.subheader("Predicciones por competición")
+
+        for _, comp in competiciones_activas.iterrows():
+            df_pred = predicciones_para_competicion(
+                df,
+                comp,
+                pred_triatlon=pred,
+            )
+
+            with st.container(border=True):
+                st.markdown(f"### {comp['nombre']}")
+                st.write(
+                    f"Tipo: **{comp['tipo']}** | Distancia: **{comp['distancia_km']:g} km**"
+                )
+
+                if df_pred.empty:
+                    st.info("No hay predicción específica para esta competición.")
+                else:
+                    st.dataframe(df_pred, use_container_width=True, hide_index=True)
+
     if recuperacion_baja:
         st.warning("Recuperación baja: hoy conviene reducir intensidad.")
     else:
@@ -145,15 +174,6 @@ def render():
         use_container_width=True,
         hide_index=True,
     )
-
-    st.subheader("Predicción triatlón")
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    c1.metric("🏊 1500 m", f"{pred['swim_1500_min']} min")
-    c2.metric("🚴 40 km", f"{pred['bike_40k_min']} min")
-    c3.metric("🏃 10 km", f"{pred['run_10k_min']} min")
-    c4.metric("⏱️ Total", f"{pred['total_estimado_min']} min")
 
     st.subheader("Últimas actividades")
 

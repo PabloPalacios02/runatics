@@ -1,9 +1,18 @@
+from datetime import timedelta
+
+import pandas as pd
 import streamlit as st
 
 from ui.theme import aplicar_estilos, hero
-
 from ui.app_state import get_datos
-from data_store.storage import cargar_perfil
+from ui.cards import metric_card
+
+from data_store.storage import (
+    cargar_perfil,
+    cargar_competicion_principal,
+    cargar_competiciones_secundarias_activas,
+)
+
 from core.training_metrics import (
     generar_entrenamiento_detallado,
     analizar_cumplimiento_entrenos,
@@ -12,14 +21,6 @@ from core.training_metrics import (
     calcular_recovery_score,
 )
 
-from datetime import timedelta
-from ui.cards import metric_card
-
-from data_store.storage import (
-    cargar_perfil,
-    cargar_competicion_principal,
-    cargar_competiciones_secundarias_activas,
-)
 from core.competition_logic import (
     dias_hasta,
     fase_por_competicion,
@@ -28,9 +29,10 @@ from core.competition_logic import (
     adaptar_plan_a_competiciones,
 )
 
+from core.competition_metrics import predicciones_para_competicion
+
 
 def render():
-
     aplicar_estilos()
 
     df, salud = get_datos()
@@ -54,15 +56,26 @@ def render():
 
     cumplimiento = analizar_cumplimiento_entrenos(df)
     pred, gaps, tendencias = predictor_inteligente(df, salud, perfil)
+
+    df_pred_comp = predicciones_para_competicion(
+        df,
+        comp_principal,
+        pred_triatlon=pred,
+    )
+
     plan = replanificar_semana_real(plan, cumplimiento, gaps, recuperacion_baja)
+
     plan = adaptar_plan_a_competiciones(
         plan,
         comp_principal,
         secundarias,
         recuperacion_baja,
     )
+
     plan["Contexto competición"] = enfoque
+
     recovery_score, recovery_estado = calcular_recovery_score(salud, df)
+
     fecha_max = df["fecha"].dt.date.max()
     ult7 = df[df["fecha"].dt.date >= fecha_max - timedelta(days=7)]
 
@@ -74,6 +87,7 @@ def render():
     metric_card(c2, "Recovery", f"{recovery_score}/100")
     metric_card(c3, "Estado", recovery_estado)
     metric_card(c4, "Sesiones semana", len(ult7))
+
     st.subheader("Objetivo de planificación")
 
     if comp_principal is not None:
@@ -84,7 +98,7 @@ def render():
 
     st.info(enfoque)
 
-    if not secundarias.empty:
+    if secundarias is not None and not secundarias.empty:
         with st.expander("Competiciones secundarias que afectan al plan"):
             st.dataframe(
                 secundarias[
@@ -110,15 +124,38 @@ def render():
 
     st.subheader("Predicción objetivo")
 
-    c1, c2, c3, c4 = st.columns(4)
+    if df_pred_comp.empty:
+        st.info("No hay predicción específica para la competición principal.")
+    else:
+        cols = st.columns(len(df_pred_comp))
 
-    metric_card(c1, "🏊 1500 m", f"{pred['swim_1500_min']} min")
-    metric_card(c2, "🚴 40 km", f"{pred['bike_40k_min']} min")
-    metric_card(c3, "🏃 10 km", f"{pred['run_10k_min']} min")
-    metric_card(c4, "⏱️ Total", f"{pred['total_estimado_min']} min")
+        for col, (_, fila) in zip(cols, df_pred_comp.iterrows()):
+            pred_val = fila["Predicción min"]
+            dif_val = fila["Diferencia min"]
 
-    with st.expander("Ver objetivo vs predicción"):
-        st.dataframe(gaps, use_container_width=True, hide_index=True)
+            pred_txt = (
+                f"{pred_val:.1f} min"
+                if pred_val is not None and pd.notna(pred_val)
+                else "-"
+            )
+
+            delta_txt = None
+            if dif_val is not None and pd.notna(dif_val):
+                delta_txt = f"{dif_val:+.1f} min vs objetivo"
+
+            metric_card(
+                col,
+                f"{fila['Disciplina']} · {fila['Distancia']}",
+                pred_txt,
+                delta=delta_txt,
+            )
+
+        with st.expander("Ver predicción detallada"):
+            st.dataframe(
+                df_pred_comp,
+                use_container_width=True,
+                hide_index=True,
+            )
 
     with st.expander("Ver tendencias últimos 90 días"):
         st.dataframe(tendencias, use_container_width=True, hide_index=True)
