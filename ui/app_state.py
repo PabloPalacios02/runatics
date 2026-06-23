@@ -35,6 +35,7 @@ def cargar_sidebar():
                 "Nutrición",
                 "Recuperación",
                 "Coach IA",
+                "Competiciones",
                 "Configuración",
                 "Ajustes",
             ],

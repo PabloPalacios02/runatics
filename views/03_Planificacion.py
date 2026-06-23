@@ -15,6 +15,19 @@ from core.training_metrics import (
 from datetime import timedelta
 from ui.cards import metric_card
 
+from data_store.storage import (
+    cargar_perfil,
+    cargar_competicion_principal,
+    cargar_competiciones_secundarias_activas,
+)
+from core.competition_logic import (
+    dias_hasta,
+    fase_por_competicion,
+    resumen_competicion,
+    enfoque_planificacion,
+    adaptar_plan_a_competiciones,
+)
+
 
 def render():
 
@@ -22,6 +35,13 @@ def render():
 
     df, salud = get_datos()
     perfil = cargar_perfil()
+
+    comp_principal = cargar_competicion_principal()
+    secundarias = cargar_competiciones_secundarias_activas()
+
+    fase_adaptada = fase_por_competicion(comp_principal)
+    dias_objetivo = dias_hasta(comp_principal)
+    enfoque = enfoque_planificacion(comp_principal, secundarias)
 
     hero(
         "Planificación",
@@ -35,6 +55,13 @@ def render():
     cumplimiento = analizar_cumplimiento_entrenos(df)
     pred, gaps, tendencias = predictor_inteligente(df, salud, perfil)
     plan = replanificar_semana_real(plan, cumplimiento, gaps, recuperacion_baja)
+    plan = adaptar_plan_a_competiciones(
+        plan,
+        comp_principal,
+        secundarias,
+        recuperacion_baja,
+    )
+    plan["Contexto competición"] = enfoque
     recovery_score, recovery_estado = calcular_recovery_score(salud, df)
     fecha_max = df["fecha"].dt.date.max()
     ult7 = df[df["fecha"].dt.date >= fecha_max - timedelta(days=7)]
@@ -43,10 +70,36 @@ def render():
 
     c1, c2, c3, c4 = st.columns(4)
 
-    metric_card(c1, "Fase", fase)
+    metric_card(c1, "Fase", fase_adaptada)
     metric_card(c2, "Recovery", f"{recovery_score}/100")
     metric_card(c3, "Estado", recovery_estado)
     metric_card(c4, "Sesiones semana", len(ult7))
+    st.subheader("Objetivo de planificación")
+
+    if comp_principal is not None:
+        st.success(f"Principal: {resumen_competicion(comp_principal)}")
+        st.write(f"Quedan **{dias_objetivo} días**.")
+    else:
+        st.info("Sin competición principal. Plan general equilibrado.")
+
+    st.info(enfoque)
+
+    if not secundarias.empty:
+        with st.expander("Competiciones secundarias que afectan al plan"):
+            st.dataframe(
+                secundarias[
+                    [
+                        "nombre",
+                        "fecha",
+                        "tipo",
+                        "distancia",
+                        "distancia_km",
+                        "prioridad",
+                    ]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
     if recuperacion_baja:
         st.warning("Recuperación baja: la semana se ha suavizado automáticamente.")
@@ -111,3 +164,6 @@ def render():
 
                 if "Ajuste automático" in fila and fila["Ajuste automático"]:
                     st.info(fila["Ajuste automático"])
+
+                if "Adaptación competición" in fila and fila["Adaptación competición"]:
+                    st.success(fila["Adaptación competición"])

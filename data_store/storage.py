@@ -1,4 +1,5 @@
 from datetime import date
+
 import pandas as pd
 import requests
 import streamlit as st
@@ -15,18 +16,11 @@ def get_current_user_id():
 
 
 def configurar_directorio_usuario(user_id):
-    """
-    Se mantiene por compatibilidad con el app.py antiguo.
-    Ya no crea carpetas porque ahora usamos Supabase.
-    """
     st.session_state["garmin_user_id"] = str(user_id)
     return str(user_id)
 
 
 def set_user_data_dir(user_id="default"):
-    """
-    Se mantiene por compatibilidad.
-    """
     st.session_state["garmin_user_id"] = str(user_id)
     return str(user_id)
 
@@ -76,7 +70,7 @@ def cargar_alimentos():
     res = (
         _client()
         .table("foods")
-        .select(",".join(columnas))
+        .select("*")
         .eq("user_id", user_id)
         .order("nombre")
         .execute()
@@ -123,7 +117,7 @@ def cargar_diario():
     res = (
         _client()
         .table("food_logs")
-        .select(",".join(columnas))
+        .select("*")
         .eq("user_id", user_id)
         .order("fecha", desc=True)
         .execute()
@@ -218,7 +212,7 @@ def crear_perfil_desde_garmin(perfil_garmin):
         "peso": round(float(peso), 1),
         "altura": float(altura),
         "edad": int(edad),
-        "objetivo": "Ganar masa + triatlón",
+        "objetivo": "Ganar masa + deporte",
         "superavit": 300,
         "target_swim_min": 30,
         "target_bike_min": 80,
@@ -274,7 +268,7 @@ def guardar_perfil(peso, altura, edad, superavit, swim, bike, run):
         "peso": float(peso),
         "altura": float(altura),
         "edad": int(edad),
-        "objetivo": "Ganar masa + triatlón",
+        "objetivo": "Ganar masa + deporte",
         "superavit": int(superavit),
         "target_swim_min": float(swim),
         "target_bike_min": float(bike),
@@ -297,7 +291,7 @@ def cargar_peso():
     res = (
         _client()
         .table("weight_logs")
-        .select(",".join(columnas))
+        .select("*")
         .eq("user_id", user_id)
         .order("fecha")
         .execute()
@@ -336,7 +330,7 @@ def cargar_favoritos():
     res = (
         _client()
         .table("favorite_meals")
-        .select(",".join(columnas))
+        .select("*")
         .eq("user_id", user_id)
         .order("nombre_favorito")
         .execute()
@@ -398,3 +392,183 @@ def registrar_favorito(nombre_favorito, fecha):
         )
 
     return True
+
+
+# ============================================================
+# COMPETICIONES
+# ============================================================
+
+
+def cargar_competiciones():
+    columnas = [
+        "id",
+        "nombre",
+        "fecha",
+        "tipo",
+        "distancia",
+        "distancia_km",
+        "prioridad",
+        "objetivo_tiempo_min",
+        "notas",
+        "activa",
+        "es_principal",
+    ]
+
+    user_id = get_current_user_id()
+
+    res = (
+        _client()
+        .table("competitions")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("fecha")
+        .execute()
+    )
+
+    df = _to_df(res.data, columnas)
+
+    if not df.empty:
+        df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce").dt.date
+        df["distancia_km"] = pd.to_numeric(df["distancia_km"], errors="coerce").fillna(
+            0
+        )
+        df["objetivo_tiempo_min"] = pd.to_numeric(
+            df["objetivo_tiempo_min"], errors="coerce"
+        ).fillna(0)
+        df["activa"] = df["activa"].fillna(False).astype(bool)
+        df["es_principal"] = df["es_principal"].fillna(False).astype(bool)
+
+    return df
+
+
+def _desmarcar_principal_actual():
+    user_id = get_current_user_id()
+
+    (
+        _client()
+        .table("competitions")
+        .update({"es_principal": False})
+        .eq("user_id", user_id)
+        .eq("es_principal", True)
+        .execute()
+    )
+
+
+def guardar_competicion(
+    nombre,
+    fecha,
+    tipo,
+    distancia,
+    distancia_km,
+    prioridad,
+    objetivo_tiempo_min,
+    notas,
+    activa=True,
+    es_principal=False,
+):
+    user_id = get_current_user_id()
+
+    if es_principal and activa:
+        _desmarcar_principal_actual()
+
+    data = {
+        "user_id": user_id,
+        "nombre": nombre,
+        "fecha": _fecha_str(fecha),
+        "tipo": tipo,
+        "distancia": distancia,
+        "distancia_km": float(distancia_km or 0),
+        "prioridad": prioridad,
+        "objetivo_tiempo_min": float(objetivo_tiempo_min or 0),
+        "notas": notas,
+        "activa": bool(activa),
+        "es_principal": bool(es_principal),
+    }
+
+    _client().table("competitions").insert(data).execute()
+
+
+def actualizar_competicion(
+    competition_id,
+    nombre,
+    fecha,
+    tipo,
+    distancia,
+    distancia_km,
+    prioridad,
+    objetivo_tiempo_min,
+    notas,
+    activa,
+    es_principal,
+):
+    if es_principal and activa:
+        _desmarcar_principal_actual()
+
+    data = {
+        "nombre": nombre,
+        "fecha": _fecha_str(fecha),
+        "tipo": tipo,
+        "distancia": distancia,
+        "distancia_km": float(distancia_km or 0),
+        "prioridad": prioridad,
+        "objetivo_tiempo_min": float(objetivo_tiempo_min or 0),
+        "notas": notas,
+        "activa": bool(activa),
+        "es_principal": bool(es_principal),
+    }
+
+    (_client().table("competitions").update(data).eq("id", competition_id).execute())
+
+
+def eliminar_competicion(competition_id):
+    (_client().table("competitions").delete().eq("id", competition_id).execute())
+
+
+def cargar_competicion_principal():
+    df = cargar_competiciones()
+
+    if df.empty:
+        return None
+
+    hoy = date.today()
+
+    futuras = df[(df["fecha"] >= hoy) & (df["activa"] == True)].copy()
+
+    if futuras.empty:
+        return None
+
+    principales = futuras[futuras["es_principal"] == True]
+
+    if not principales.empty:
+        return principales.sort_values("fecha").iloc[0]
+
+    prioridad_orden = {"A": 1, "B": 2, "C": 3}
+    futuras["prioridad_num"] = futuras["prioridad"].map(prioridad_orden).fillna(9)
+
+    return futuras.sort_values(["prioridad_num", "fecha"]).iloc[0]
+
+
+def cargar_competiciones_secundarias_activas():
+    df = cargar_competiciones()
+
+    if df.empty:
+        return df
+
+    hoy = date.today()
+
+    secundarias = df[
+        (df["fecha"] >= hoy) & (df["activa"] == True) & (df["es_principal"] != True)
+    ].copy()
+
+    return secundarias.sort_values("fecha")
+
+
+def cargar_competiciones_activas():
+    df = cargar_competiciones()
+
+    if df.empty:
+        return df
+
+    hoy = date.today()
+
+    return df[(df["fecha"] >= hoy) & (df["activa"] == True)].sort_values("fecha")

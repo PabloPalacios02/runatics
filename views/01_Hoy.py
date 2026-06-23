@@ -13,12 +13,25 @@ from core.training_metrics import (
     calcular_recovery_score,
 )
 
+from data_store.storage import (
+    cargar_perfil,
+    cargar_diario,
+    cargar_competicion_principal,
+    cargar_competiciones_secundarias_activas,
+)
+from core.competition_logic import dias_hasta, fase_por_competicion, resumen_competicion
+
 
 def render():
     aplicar_estilos()
 
     df, salud = get_datos()
     perfil = cargar_perfil()
+
+    comp_principal = cargar_competicion_principal()
+    secundarias = cargar_competiciones_secundarias_activas()
+    fase_competicion = fase_por_competicion(comp_principal)
+    dias_competicion = dias_hasta(comp_principal)
 
     hero("Hoy", "Resumen rápido de entrenamiento, nutrición y recuperación.")
 
@@ -62,8 +75,36 @@ def render():
 
     metric_card(c1, "❤️ Recovery", f"{recovery_score}/100")
     metric_card(c2, "Estado", recovery_estado)
-    metric_card(c3, "Fase", fase)
-    metric_card(c4, "Días objetivo", (OBJETIVO_FECHA - hoy).days)
+    metric_card(c3, "Fase", fase_competicion)
+    metric_card(
+        c4, "Días objetivo", "-" if dias_competicion is None else dias_competicion
+    )
+
+    st.subheader("Objetivo deportivo")
+
+    if comp_principal is not None:
+        st.success(f"Principal: {resumen_competicion(comp_principal)}")
+
+        if not secundarias.empty:
+            with st.expander("Competiciones secundarias activas"):
+                st.dataframe(
+                    secundarias[
+                        [
+                            "nombre",
+                            "fecha",
+                            "tipo",
+                            "distancia",
+                            "distancia_km",
+                            "prioridad",
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+    else:
+        st.info(
+            "No hay competición principal activa. La app usará una planificación general."
+        )
 
     if recuperacion_baja:
         st.warning("Recuperación baja: hoy conviene reducir intensidad.")

@@ -29,6 +29,7 @@ VIEWS = {
     "Coach IA": "views/06_Coach_IA.py",
     "Configuración": "views/07_Configuracion.py",
     "Ajustes": "views/08_Ajustes.py",
+    "Competiciones": "views/09_Competiciones.py",
 }
 
 
