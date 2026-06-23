@@ -1,22 +1,26 @@
-# GarminDashboard refactorizado
+# RUNATICS
 
-Ejecutar:
+Aplicación web en Streamlit para seguimiento de entrenamiento, recuperación, nutrición y planificación de triatlón usando datos de Garmin, Strava, Supabase y Gemini IA.
+
+## Funcionalidades
+
+- Sincronización Garmin Connect
+- Sincronización Strava
+- Fusión de actividades y eliminación de duplicados
+- Dashboard diario
+- Seguimiento de entrenamientos
+- Planificación semanal inteligente
+- Predicción de rendimiento en triatlón olímpico
+- Registro de nutrición y macros
+- Registro de peso
+- Seguimiento de recuperación
+- Coach IA con Gemini
+- Persistencia de datos en Supabase
+- App online accesible desde móvil y PC
+
+## Ejecutar en local
 
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
-
-Crea un `secrets.toml` real a partir de `secrets.toml.example`. No he incluido tu `secrets.toml` original para no compartir claves privadas.
-
-## Estructura
-
-- `app.py`: interfaz principal Streamlit.
-- `config/settings.py`: constantes y carga de secretos.
-- `services/garmin_service.py`: conexión y normalización Garmin.
-- `services/strava_service.py`: conexión y normalización Strava.
-- `core/activity_merge.py`: fusión y eliminación de duplicados.
-- `core/training_metrics.py`: recomendaciones, predicción, planificación y recuperación.
-- `core/nutrition_metrics.py`: sugerencias nutricionales.
-- `core/ai_coach.py`: coach IA con Gemini.
-- `data_store/storage.py`: lectura/escritura CSV por usuario.

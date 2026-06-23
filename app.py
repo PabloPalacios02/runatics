@@ -2,8 +2,9 @@ import importlib.util
 from pathlib import Path
 import streamlit as st
 
-from config.settings import APP_TITLE, APP_CAPTION
 from ui.app_state import cargar_sidebar
+
+from ui.theme import aplicar_estilos, hero
 
 st.set_page_config(
     page_title="RUNATICS",
@@ -11,8 +12,10 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title(APP_TITLE)
-st.caption(APP_CAPTION)
+aplicar_estilos()
+hero(
+    "RUNATICS", "Entrenamiento, nutrición y recuperación para triatlón y masa muscular."
+)
 
 pagina = cargar_sidebar()
 
